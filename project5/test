@@ -1,0 +1,190 @@
+import {AfterViewInit, Component, ViewChild} from '@angular/core';
+import {AsyncPipe, NgForOf, NgIf} from "@angular/common";
+import {CurrentStateService} from "./services/current-state.service";
+import {FormControl, ReactiveFormsModule} from '@angular/forms';
+import {BehaviorSubject, debounceTime, distinctUntilChanged, filter, switchMap, tap} from 'rxjs';
+import {MatTableDataSource, MatTableModule} from "@angular/material/table";
+import {MatPaginator, MatPaginatorIntl, MatPaginatorModule, PageEvent} from "@angular/material/paginator";
+import {PitInformation} from "../../models/pit-information";
+import {MyCustomPaginatorIntl} from "../../shared/my-custom-paginator-intl";
+import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
+
+
+/**
+ * Component CurrentState
+ */
+@Component({
+    selector: 'app-current-state',
+    templateUrl: './current-state.component.html',
+    styleUrls: ['./current-state.component.scss'],
+    imports: [
+        NgIf,
+        NgForOf,
+        ReactiveFormsModule,
+        MatTableModule,
+        MatPaginatorModule,
+        MatProgressSpinnerModule,
+        AsyncPipe
+    ],
+    standalone: true,
+    providers: [{provide: MatPaginatorIntl, useClass: MyCustomPaginatorIntl}]
+})
+export class CurrentStateComponent implements AfterViewInit {
+
+    /**
+     * Columns to display in mat table
+     */
+    displayedColumns: string[] = ['quayRef', 'quayName'];
+    /**
+     * PIT information Response necessary for the table view
+     */
+    public totalPitInformationCount!: number;
+    /**
+     * form control to handle the filter part
+     */
+    public searchControl = new FormControl();
+    /**
+     * flag to know if we are in search mode
+     */
+    public isModeSearch = false;
+    /**
+     * search term used for the filter
+     */
+    public searchTerm: string = "";
+    /**
+     * list of suggestions for the autocomplete
+     */
+    public suggestions: string[] = [];
+    /**
+     * selected suggestion used for the filter
+     */
+    public selectedSuggestion: string | null = null;
+    /**
+     * old selected suggestion used for the filter
+     */
+    public oldSelectedSuggestion: string | null = null;
+    /**
+     * paginator from material
+     */
+    @ViewChild(MatPaginator) paginator!: MatPaginator;
+    /**
+     * data source of Material containing pitInformation
+     */
+    dataSource = new MatTableDataSource<PitInformation>();
+
+    /**
+     * Sets the loading indicator to false, indicating that the data loading process has completed.
+     */
+    private _isLoading: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
+
+    /**
+     * constructor of the component
+     * @param currentStateService service used to get pit information
+     */
+    constructor(private currentStateService: CurrentStateService) {
+    }
+
+    /**
+     * Getter to expose _isLoading as an observable
+     */
+    get isLoading() {
+        return this._isLoading.asObservable();
+    }
+
+    /**
+     * ngAfterViewInit of the component
+     * Will make a request to the service to retrieve pit information for the table
+     */
+    ngAfterViewInit(): void {
+        // at init of this page we do a search without filter to fill the table
+        this.loadData("", this.paginator.pageSize, this.paginator.pageIndex);
+        //subscribe for any changes on our form control
+        this.searchControl.valueChanges.pipe(
+            debounceTime(300), // Waits 300 ms after the last keystroke before emitting the value to avoid spamming
+            distinctUntilChanged(), // Only emit if the current value is different from the last
+            tap(value => {
+                if (value.length < 3) { //not enough data to make autocomplete
+                    this.suggestions = []; // Clear suggestions if input length is less than 3
+                }
+                if (this.selectedSuggestion && value !== this.selectedSuggestion) {
+                    // Reset selectedSuggestion to null if the input value no longer matches the selected suggestion
+                    this.selectedSuggestion = null;
+                }
+                //this.isModeSearch = false;
+            }),
+            filter(value => value.length >= 3), //enough data to make autocomplete
+            switchMap(query => this.currentStateService.getAutocompleteQuay(query)) // Cancels previous requests, keeping only the latest
+        ).subscribe(suggestions => {
+            // Updates the suggestions array with the results from the HTTP request
+            this.suggestions = suggestions;
+        });
+        this._isLoading.subscribe()
+
+        // Abonnez-vous aux changements de la pagination
+        this.paginator.page.subscribe((event: PageEvent) => {
+            this.loadData(this.searchTerm, event.pageSize, event.pageIndex);
+        });
+
+    }
+
+    /**
+     * method to handle selection of a suggestion to apply it to the form control
+     * @param suggestion selected suggestion
+     */
+    handleSelect(suggestion: string) {
+        this.selectedSuggestion = suggestion;
+        this.searchControl.setValue(suggestion, {emitEvent: false});
+        this.suggestions = []; // Clear suggestions after selection
+    }
+
+    /**
+     * method to handle search, it's make a call on the load data call, this method manage the filter
+     */
+    handleSearch() {
+        console.log("search detected");
+        this.isModeSearch = true;
+        const filter = this.selectedSuggestion ?? "";
+        this.searchTerm = filter;
+        if (this.oldSelectedSuggestion != this.selectedSuggestion) {
+            this.loadData(filter, this.paginator.pageSize, 0)
+            this.paginator.pageIndex = 0;
+            this.oldSelectedSuggestion = this.selectedSuggestion;
+        } else {
+            this.loadData(filter, this.paginator.pageSize, this.paginator.pageIndex);
+        }
+    }
+
+    handleSearch() {
+      // Met à jour le terme de recherche avec la suggestion sélectionnée ou la valeur de la barre de recherche
+      this.searchTerm = this.selectedSuggestion ?? this.searchControl.value ?? "";
+      this.paginator.pageIndex = 0; // Réinitialise l'index de pagination
+      this.loadData(this.searchTerm, this.paginator.pageSize, this.paginator.pageIndex);
+    }
+
+
+    /**
+     * method to load data, it's make a call on our service to get PIT information with as parameter filter page and pageSize
+     * @param filter pattern of search (it can be empty)
+     * @param pageSize size of page
+     * @param pageIndex page index
+     */
+    loadData(filter: string, pageSize: number, pageIndex: number) {
+        setTimeout(() => {
+            this._isLoading.next(true);
+        });
+        // Clear the current data to prevent it from showing while loading
+        this.dataSource.data = [];
+        this.currentStateService.getPitInformation(filter, pageSize, pageIndex).subscribe(
+            (pitInformationResponse) => {
+                if (pitInformationResponse?.pitInformations) {
+                    setTimeout(() => {
+                        this.dataSource.data = pitInformationResponse.pitInformations;
+                        this.totalPitInformationCount = pitInformationResponse.totalPitInformationCount;
+                        this._isLoading.next(false);
+                    });
+                }
+
+            }
+        );
+    }
+}

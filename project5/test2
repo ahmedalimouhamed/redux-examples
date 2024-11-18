@@ -1,0 +1,91 @@
+import {AfterViewInit, Component, ViewChild} from '@angular/core';
+import {AsyncPipe, NgForOf, NgIf} from "@angular/common";
+import {CurrentStateService} from "./services/current-state.service";
+import {FormControl, ReactiveFormsModule} from '@angular/forms';
+import {BehaviorSubject, debounceTime, distinctUntilChanged, filter, switchMap, tap} from 'rxjs';
+import {MatTableDataSource, MatTableModule} from "@angular/material/table";
+import {MatPaginator, MatPaginatorIntl, MatPaginatorModule, PageEvent} from "@angular/material/paginator";
+import {PitInformation} from "../../models/pit-information";
+import {MyCustomPaginatorIntl} from "../../shared/my-custom-paginator-intl";
+import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
+
+@Component({
+    selector: 'app-current-state',
+    templateUrl: './current-state.component.html',
+    styleUrls: ['./current-state.component.scss'],
+    imports: [
+        NgIf,
+        NgForOf,
+        ReactiveFormsModule,
+        MatTableModule,
+        MatPaginatorModule,
+        MatProgressSpinnerModule,
+        AsyncPipe
+    ],
+    standalone: true,
+    providers: [{provide: MatPaginatorIntl, useClass: MyCustomPaginatorIntl}]
+})
+export class CurrentStateComponent implements AfterViewInit {
+    displayedColumns: string[] = ['quayRef', 'quayName'];
+    public totalPitInformationCount!: number;
+    public searchControl = new FormControl();
+    public searchTerm: string = "";
+    public suggestions: string[] = [];
+    public selectedSuggestion: string | null = null;
+    @ViewChild(MatPaginator) paginator!: MatPaginator;
+    dataSource = new MatTableDataSource<PitInformation>();
+    private _isLoading: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(false);
+
+    constructor(private currentStateService: CurrentStateService) {}
+
+    get isLoading() {
+        return this._isLoading.asObservable();
+    }
+
+    ngAfterViewInit(): void {
+        // Initial table data load
+        this.loadData("", this.paginator.pageSize, this.paginator.pageIndex);
+
+        // Handle search input changes
+        this.searchControl.valueChanges.pipe(
+            debounceTime(300),
+            distinctUntilChanged(),
+            tap(value => {
+                if (value.length < 3) this.suggestions = [];
+                if (this.selectedSuggestion && value !== this.selectedSuggestion) {
+                    this.selectedSuggestion = null;
+                }
+            }),
+            filter(value => value.length >= 3),
+            switchMap(query => this.currentStateService.getAutocompleteQuay(query))
+        ).subscribe(suggestions => this.suggestions = suggestions);
+
+        // Handle paginator changes
+        this.paginator.page.subscribe((event: PageEvent) => {
+            this.loadData(this.searchTerm, event.pageSize, event.pageIndex);
+        });
+    }
+
+    handleSelect(suggestion: string) {
+        this.selectedSuggestion = suggestion;
+        this.searchControl.setValue(suggestion, {emitEvent: false});
+        this.suggestions = [];
+        this.handleSearch();
+    }
+
+    handleSearch() {
+        this.searchTerm = this.selectedSuggestion ?? this.searchControl.value ?? "";
+        this.paginator.pageIndex = 0; // Reset to first page
+        this.loadData(this.searchTerm, this.paginator.pageSize, this.paginator.pageIndex);
+    }
+
+    loadData(filter: string, pageSize: number, pageIndex: number) {
+        this._isLoading.next(true);
+        this.dataSource.data = [];
+        this.currentStateService.getPitInformation(filter, pageSize, pageIndex).subscribe(response => {
+            this.dataSource.data = response?.pitInformations || [];
+            this.totalPitInformationCount = response?.totalPitInformationCount || 0;
+            this._isLoading.next(false);
+        });
+    }
+}

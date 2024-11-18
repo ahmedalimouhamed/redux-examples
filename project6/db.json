@@ -1,0 +1,73 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "username": "admin",
+      "password": "admin",
+      "role": "admin"
+    },
+    {
+      "id": 2,
+      "username": "manager",
+      "password": "manager",
+      "role": "manager"
+    },
+    {
+      "id": 3,
+      "username": "rep",
+      "password": "rep",
+      "role": "rep"
+    }
+  ],
+  "customers": [
+    {
+      "id": 1,
+      "name": "Acme Corp",
+      "status": "Active",
+      "assignedTo": 2
+    },
+    {
+      "id": 2,
+      "name": "Beta Inc",
+      "status": "Potential",
+      "assignedTo": 3
+    },
+    {
+      "id": "fb79",
+      "name": "test test",
+      "status": "Active"
+    }
+  ],
+  "sales": [
+    {
+      "id": 1,
+      "stage": "Lead",
+      "amount": 10000,
+      "repId": 3
+    },
+    {
+      "id": 2,
+      "stage": "Opportunity",
+      "amount": 25000,
+      "repId": 2
+    },
+    {
+      "id": 3,
+      "stage": "Lead",
+      "amount": 25000,
+      "repId": 2
+    },
+    {
+      "id": 4,
+      "stage": "Opportunity",
+      "amount": 25000,
+      "repId": 2
+    },
+    {
+      "id": 5,
+      "stage": "Won",
+      "amount": 25000,
+      "repId": 2
+    }
+  ]
+}

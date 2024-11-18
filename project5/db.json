@@ -1,0 +1,46 @@
+{
+  "users": [
+    {
+      "id": "1",
+      "username": "admin",
+      "password": "admin",
+      "role": "admin"
+    },
+    {
+      "id": "2",
+      "username": "user",
+      "password": "user",
+      "role": "user"
+    }
+  ],
+  "projects": [
+    {
+      "id": "1",
+      "name": "project Alpha",
+      "description": "sample project",
+      "tasks": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "289d",
+      "name": "test",
+      "description": "test"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "1",
+      "name": "Design the UI",
+      "status": "To Do",
+      "assignedTo": 2
+    },
+    {
+      "id": "2",
+      "name": "Develop the backend",
+      "status": "In Process",
+      "assignedTo": 1
+    }
+  ]
+}
