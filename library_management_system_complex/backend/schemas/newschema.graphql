@@ -1,0 +1,92 @@
+scalar Date
+
+type Book {
+  id: ID!
+  title: String!
+  author: Author!
+  genre: Genre!
+  reviews: [Review]
+  inventory: Inventory
+}
+
+type Author {
+  id: ID!
+  name: String!
+  age: Int
+  books: [Book]
+}
+
+type Genre {
+  id: ID!
+  name: String!
+  description: String
+  books: [Book]
+}
+
+type Review {
+  id: ID!
+  rating: Int!
+  comment: String
+  book: Book!
+  reader: Reader!
+}
+
+type Reader {
+  id: ID!
+  name: String!
+  email: String!
+  borrowingRecords: [BorrowingRecord]
+  reviews: [Review]
+}
+
+type BorrowingRecord {
+  id: ID!
+  reader: Reader!
+  book: Book!
+  borrowDate: String!
+  dueDate: String!
+  fine: Fine
+}
+
+type Fine {
+  id: ID!
+  amount: Float!
+  paid: Boolean!
+  borrowingRecord: BorrowingRecord!
+}
+
+type Inventory {
+  id: ID!
+  book: Book!
+  totalCopies: Int!
+  availableCopies: Int!
+}
+
+input BookInput {
+    title: String!
+    authorId: ID!
+  }
+
+
+type Query {
+  books: [Book]
+  book(id: ID!): Book
+  authors: [Author]
+  author(id: ID!): Author
+  genres: [Genre]
+  genre(id: ID!): Genre
+  readers: [Reader]
+  reader(id: ID!): Reader
+  borrowingRecords: [BorrowingRecord]
+  borrowingRecord(id: ID!): BorrowingRecord
+}
+
+type Mutation {
+  addBook(title: String!, authorId: ID!, genreId: ID!): Book
+  addAuthor(name: String!, age: Int): Author
+  addGenre(name: String!, description: String!, books: [BookInput]): Genre
+  addReader(name: String!, email: String!): Reader
+  borrowBook(readerId: ID!, bookId: ID!, dueDate: Date!): BorrowingRecord
+  returnBook(borrowingRecordId: ID!): BorrowingRecord
+  addReview(bookId: ID!, readerId: ID!, rating: Int!, comment: String): Review
+}
